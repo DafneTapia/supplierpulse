@@ -18,10 +18,10 @@ N_ORDERS = 500
 COUNTRIES = ["FR", "ES", "DE", "IT", "PL"]
 
 
-def generar_proveedores():
-    filas = []
+def generate_suppliers():
+    rows = []
     for i in range(1, N_SUPPLIERS + 1):
-        fila = {
+        row = {
             "supplier_id": f"S{i:03d}",
             "name": fake.company(),
             "country": random.choice(COUNTRIES),
@@ -30,87 +30,87 @@ def generar_proveedores():
         }
         r = random.random()
         if r < 0.06:
-            fila["rating"] = None                       # rating vacío
+            row["rating"] = None                        # missing rating
         elif r < 0.12:
-            fila["country"] = fila["country"].lower()   # "fr" en vez de "FR"
+            row["country"] = row["country"].lower()     # "fr" instead of "FR"
         elif r < 0.16:
-            fila["name"] = f"  {fila['name']}  "        # espacios sobrantes
-        filas.append(fila)
-    for _ in range(3):                                  # filas duplicadas
-        filas.append(dict(random.choice(filas)))
-    return filas
+            row["name"] = f"  {row['name']}  "          # extra whitespace
+        rows.append(row)
+    for _ in range(3):                                  # duplicated rows
+        rows.append(dict(random.choice(rows)))
+    return rows
 
 
-def generar_pedidos(proveedores):
-    ids = [p["supplier_id"] for p in proveedores]
-    inicio = date(2025, 1, 1)
-    filas, fechas_reales = [], {}
+def generate_orders(suppliers):
+    supplier_ids = [s["supplier_id"] for s in suppliers]
+    start = date(2025, 1, 1)
+    rows, true_dates = [], {}
     for i in range(1, N_ORDERS + 1):
-        fecha = inicio + timedelta(days=random.randint(0, 600))
-        fila = {
+        order_date = start + timedelta(days=random.randint(0, 600))
+        row = {
             "order_id": f"O{i:05d}",
-            "supplier_id": random.choice(ids),
-            "order_date": fecha.isoformat(),
+            "supplier_id": random.choice(supplier_ids),
+            "order_date": order_date.isoformat(),
             "amount": round(random.uniform(100, 20000), 2),
             "currency": "EUR",
         }
-        fechas_reales[fila["order_id"]] = fecha
+        true_dates[row["order_id"]] = order_date
         r = random.random()
         if r < 0.03:
-            fila["amount"] = -fila["amount"]            # importe negativo
+            row["amount"] = -row["amount"]              # negative amount
         elif r < 0.06:
-            fila["amount"] = "N/A"                      # importe no numérico
+            row["amount"] = "N/A"                       # non-numeric amount
         elif r < 0.09:
-            fila["order_date"] = "31/02/2025"           # fecha imposible
+            row["order_date"] = "31/02/2025"            # impossible date
         elif r < 0.12:
-            fila["supplier_id"] = "S999"                # proveedor inexistente
-        filas.append(fila)
-    return filas, fechas_reales
+            row["supplier_id"] = "S999"                 # unknown supplier
+        rows.append(row)
+    return rows, true_dates
 
 
-def generar_entregas(pedidos, fechas_reales):
-    filas = []
-    for p in pedidos:
+def generate_deliveries(orders, true_dates):
+    rows = []
+    for order in orders:
         if random.random() < 0.08:
-            continue                                    # pedido sin entrega
-        fecha = fechas_reales[p["order_id"]]
-        cantidad = random.randint(10, 500)
-        entrega = fecha + timedelta(days=random.randint(2, 20))
-        fila = {
-            "order_id": p["order_id"],
-            "promised_date": (fecha + timedelta(days=10)).isoformat(),
-            "delivered_date": entrega.isoformat(),
-            "quantity_ordered": cantidad,
-            "quantity_received": cantidad,
+            continue                                    # order without delivery
+        order_date = true_dates[order["order_id"]]
+        quantity = random.randint(10, 500)
+        delivered = order_date + timedelta(days=random.randint(2, 20))
+        row = {
+            "order_id": order["order_id"],
+            "promised_date": (order_date + timedelta(days=10)).isoformat(),
+            "delivered_date": delivered.isoformat(),
+            "quantity_ordered": quantity,
+            "quantity_received": quantity,
             "status": "delivered",
         }
         r = random.random()
         if r < 0.04:
-            fila["delivered_date"] = (fecha - timedelta(days=3)).isoformat()  # antes del pedido
+            row["delivered_date"] = (order_date - timedelta(days=3)).isoformat()  # delivered before order
         elif r < 0.10:
-            fila["quantity_received"] = int(cantidad * random.uniform(0.5, 0.95))  # entrega parcial
-            fila["status"] = "partial"
+            row["quantity_received"] = int(quantity * random.uniform(0.5, 0.95))  # partial delivery
+            row["status"] = "partial"
         elif r < 0.14:
-            fila["status"] = "DELIVERED"                # mayúsculas inconsistentes
-        filas.append(fila)
-    return filas
+            row["status"] = "DELIVERED"                 # inconsistent casing
+        rows.append(row)
+    return rows
 
 
-def guardar_csv(ruta, filas):
-    with open(ruta, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=filas[0].keys())
+def save_csv(path, rows):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
         writer.writeheader()
-        writer.writerows(filas)
+        writer.writerows(rows)
 
 
 if __name__ == "__main__":
-    proveedores = generar_proveedores()
-    pedidos, fechas_reales = generar_pedidos(proveedores)
-    entregas = generar_entregas(pedidos, fechas_reales)
+    suppliers = generate_suppliers()
+    orders, true_dates = generate_orders(suppliers)
+    deliveries = generate_deliveries(orders, true_dates)
 
-    guardar_csv(OUT / "suppliers.csv", proveedores)
-    guardar_csv(OUT / "orders.csv", pedidos)
+    save_csv(OUT / "suppliers.csv", suppliers)
+    save_csv(OUT / "orders.csv", orders)
     with open(OUT / "deliveries.json", "w", encoding="utf-8") as f:
-        json.dump(entregas, f, indent=2, ensure_ascii=False)
+        json.dump(deliveries, f, indent=2, ensure_ascii=False)
 
-    print(f"Proveedores: {len(proveedores)}, pedidos: {len(pedidos)}, entregas: {len(entregas)}")
+    print(f"Suppliers: {len(suppliers)}, orders: {len(orders)}, deliveries: {len(deliveries)}")
