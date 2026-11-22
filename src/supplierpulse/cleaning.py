@@ -10,6 +10,7 @@ def clean_suppliers(df: DataFrame) -> DataFrame:
           .withColumn("rating", F.expr("try_cast(trim(rating) as double)"))
     )
 
+
 def clean_orders(df: DataFrame) -> DataFrame:
     """Cast types and flag invalid rows with a rejection reason."""
     typed = (
@@ -21,4 +22,15 @@ def clean_orders(df: DataFrame) -> DataFrame:
         F.when(F.col("amount").isNull(), "invalid_amount")
          .when(F.col("amount") <= 0, "non_positive_amount")
          .when(F.col("order_date").isNull(), "invalid_date"),
+    )
+
+
+def clean_deliveries(df: DataFrame) -> DataFrame:
+    """Normalize status, cast dates and flag partial and late deliveries."""
+    return (
+        df.withColumn("status", F.lower(F.trim(F.col("status"))))
+          .withColumn("promised_date", F.expr("try_to_date(promised_date, 'yyyy-MM-dd')"))
+          .withColumn("delivered_date", F.expr("try_to_date(delivered_date, 'yyyy-MM-dd')"))
+          .withColumn("is_partial", F.col("quantity_received") < F.col("quantity_ordered"))
+          .withColumn("is_late", F.col("delivered_date") > F.col("promised_date"))
     )
